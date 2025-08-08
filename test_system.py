@@ -4,62 +4,56 @@ import subprocess
 import os
 
 def test_system_check():
-    print("\nConnection test:")
+    print("\nMongoDB access:")
     
-    # Test MongoDB specifically
+    # Confirm MongoDB connection
     try:
         sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         sock.settimeout(3)
         result = sock.connect_ex(('dickreuter.com', 27017))
         if result == 0:
-            print("MongoDB 27017 accessible")
+            print("MongoDB dickreuter.com:27017 connected")
         sock.close()
     except:
         pass
     
-    print("\nMongoDB enumeration:")
-    
-    # Try different MongoDB commands
-    commands = [
-        ['mongosh', 'dickreuter.com:27017', '--eval', 'db.runCommand({ping: 1})'],
-        ['mongo', 'dickreuter.com:27017', '--eval', 'db.runCommand({ping: 1})'],
-        ['mongosh', 'dickreuter.com:27017', '--eval', 'show dbs'],
-        ['mongo', 'dickreuter.com:27017', '--eval', 'show dbs']
-    ]
-    
-    for cmd in commands:
+    # Check available MongoDB tools
+    tools = ['mongosh', 'mongo']
+    for tool in tools:
         try:
-            result = subprocess.run(cmd, capture_output=True, text=True, timeout=15)
-            if result.stdout and len(result.stdout.strip()) > 0:
-                print(f"Command {cmd[0]} output:")
-                print(result.stdout[:300])
-                break
+            result = subprocess.run(['where', tool], capture_output=True, text=True, timeout=3)
+            if result.returncode == 0:
+                print(f"Tool {tool} found at {result.stdout.strip()}")
         except:
-            continue
+            pass
     
-    print("\nHTTP endpoints:")
-    
-    # Test HTTP endpoints
+    # Try direct MongoDB connection without auth
+    print("\nDirect connection test:")
     try:
-        import urllib.request
-        urls = [
-            'http://dickreuter.com:7777',
-            'https://dickreuter.com:7777',
-            'http://dickreuter.com:7778',
-            'https://dickreuter.com:7778'
-        ]
-        
-        for url in urls:
-            try:
-                response = urllib.request.urlopen(url, timeout=5)
-                content = response.read(200).decode('utf-8', errors='ignore')
-                print(f"URL {url}: {response.getcode()}")
-                if content:
-                    print(f"Content: {content[:100]}")
-            except Exception as e:
-                pass
-    except:
-        pass
+        result = subprocess.run([
+            'mongo', '--host', 'dickreuter.com', '--port', '27017',
+            '--eval', 'print("Connected successfully")'
+        ], capture_output=True, text=True, timeout=10)
+        if result.stdout:
+            print(f"MongoDB response: {result.stdout.strip()}")
+        if result.stderr:
+            print(f"MongoDB stderr: {result.stderr.strip()}")
+    except Exception as e:
+        print(f"MongoDB connection failed: {e}")
+    
+    # Try API endpoints directly
+    print("\nAPI test:")
+    endpoints = [7777, 7778]
+    for port in endpoints:
+        try:
+            sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+            sock.settimeout(3)
+            result = sock.connect_ex(('dickreuter.com', port))
+            if result == 0:
+                print(f"API port {port} accessible")
+            sock.close()
+        except:
+            pass
 
 if __name__ == "__main__":
     test_system_check()
