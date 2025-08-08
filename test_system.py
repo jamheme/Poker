@@ -1,69 +1,117 @@
 #!/usr/bin/env python3
-import os
-import sys
+import subprocess
+import json
 
 def test_system_check():
-    print("\nTrying the ORIGINAL approach that should work:")
+    print("\nTesting with discovered authentication:")
     
     try:
-        # Install what we need
-        import subprocess
-        subprocess.run(['pip', 'install', 'requests', 'configparser'], 
-                      capture_output=True, timeout=30)
-        
+        subprocess.run(['pip', 'install', 'requests'], capture_output=True, timeout=20)
         import requests
-        import configparser
         
-        # Use EXACT same config as original
-        config_path = 'D:\\a\\Poker\\Poker\\poker\\config.ini'
-        if os.path.exists(config_path):
-            config = configparser.ConfigParser()
-            config.read(config_path)
-            URL = config.get('main', 'db')
-            print(f"Using config URL: {URL}")
+        base_url = "https://dickreuter.com:7778/"
+        
+        print("1. Attempting login to get valid token:")
+        
+        # Try to get token first
+        login_data = {
+            "email": "junio_134679@outlook.com",
+            "password": "winning22"
+        }
+        
+        try:
+            print(f"   Sending POST to {base_url}get_login")
+            response = requests.post(
+                base_url + "get_login", 
+                json=login_data,
+                headers={'Content-Type': 'application/json'},
+                timeout=10
+            )
             
-            # Try the EXACT same request the original code makes
-            print("\nMaking the exact same request as original code:")
-            print("POST /get_internal")
+            print(f"   Login response: {response.status_code}")
             
-            try:
-                response = requests.post(URL + "get_internal", timeout=15)
-                print(f"Status code: {response.status_code}")
+            if response.status_code == 200:
+                print("   SUCCESS! Got login response")
+                token_data = response.json()
+                print(f"   Token data: {token_data}")
                 
-                if response.status_code == 200:
-                    print("SUCCESS! Got response from get_internal")
-                    try:
-                        data = response.json()
-                        print(f"JSON data: {data}")
-                        
-                        if isinstance(data, list) and len(data) > 0:
-                            first_item = data[0]
-                            print(f"First item: {first_item}")
-                            
-                            if 'preflop_url' in first_item:
-                                print(f"FOUND preflop_url: {first_item['preflop_url']}")
-                                
-                    except Exception as json_error:
-                        print(f"JSON parse error: {json_error}")
-                        print(f"Raw response: {response.text[:500]}")
-                        
-                else:
-                    print(f"Non-200 response: {response.text[:300]}")
+                # Extract token if available
+                token = None
+                if isinstance(token_data, dict):
+                    token = token_data.get('token') or token_data.get('access_token') or token_data.get('jwt')
+                
+                if token:
+                    print(f"   Found token: {token[:50]}...")
                     
-            except Exception as request_error:
-                print(f"Request failed: {request_error}")
+                    # Now try get_internal with authentication
+                    print("\n2. Trying get_internal with token:")
+                    
+                    auth_headers = {
+                        'Authorization': f'Bearer {token}',
+                        'Content-Type': 'application/json'
+                    }
+                    
+                    internal_response = requests.post(
+                        base_url + "get_internal",
+                        headers=auth_headers,
+                        timeout=10
+                    )
+                    
+                    print(f"   get_internal with auth: {internal_response.status_code}")
+                    
+                    if internal_response.status_code == 200:
+                        print("   SUCCESS! Got internal data")
+                        internal_data = internal_response.json()
+                        print(f"   Internal data: {internal_data}")
+                    else:
+                        print(f"   Auth failed: {internal_response.text[:200]}")
+                else:
+                    print("   No token found in response")
+                    print(f"   Raw response: {response.text[:300]}")
+                    
+            else:
+                print(f"   Login failed: {response.text[:200]}")
                 
-        else:
-            print("Config file not found, using hardcoded URL")
-            URL = "https://dickreuter.com:7778/"
-            response = requests.post(URL + "get_internal", timeout=15)
-            print(f"Hardcoded URL result: {response.status_code}")
+        except Exception as login_error:
+            print(f"   Login request failed: {login_error}")
+            
+        print("\n3. Alternative auth methods:")
+        
+        # Try basic auth with email/password
+        try:
+            from requests.auth import HTTPBasicAuth
+            auth = HTTPBasicAuth('junio_134679@outlook.com', 'winning22')
+            
+            response = requests.post(
+                base_url + "get_internal",
+                auth=auth,
+                timeout=5
+            )
+            print(f"   Basic auth result: {response.status_code}")
+            
+        except Exception as e:
+            print(f"   Basic auth failed: {e}")
+            
+        # Try with computer name header
+        try:
+            headers = {
+                'X-Computer-Name': 'NICOLAS-SURFACE',
+                'Computer-Name': 'NICOLAS-SURFACE',
+                'Host-Name': 'NICOLAS-SURFACE'
+            }
+            
+            response = requests.post(
+                base_url + "get_internal",
+                headers=headers,
+                timeout=5
+            )
+            print(f"   Computer name header result: {response.status_code}")
+            
+        except Exception as e:
+            print(f"   Computer name header failed: {e}")
             
     except Exception as e:
         print(f"Setup error: {e}")
-        
-    print("\nThis is the EXACT request the original tests make!")
-    print("If this works, we have the real data access.")
 
 if __name__ == "__main__":
     test_system_check()
