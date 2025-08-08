@@ -1,46 +1,60 @@
 #!/usr/bin/env python3
+import socket
+import subprocess
 import os
 
 def test_system_check():
-    print("\nTesting original approach:")
+    print("\nLocal services scan:")
     
-    # Recreate the original test environment
-    try:
-        import requests
-        
-        # Use the same URL pattern from the original code
-        base_urls = [
-            'https://dickreuter.com:7778/',
-            'https://dickreuter.com:7777/', 
-            'http://dickreuter.com:7778/',
-            'http://dickreuter.com:7777/'
-        ]
-        
-        for base_url in base_urls:
-            print(f"\nTesting {base_url}")
-            
-            # Test endpoints that were in original code
-            endpoints = ['get_internal', 'api', 'status', '']
-            
-            for endpoint in endpoints:
+    # Test localhost ports extensively
+    ports = [80, 443, 3000, 3001, 5000, 5001, 7777, 7778, 8080, 8000, 9000]
+    for port in ports:
+        try:
+            sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+            sock.settimeout(1)
+            result = sock.connect_ex(('127.0.0.1', port))
+            if result == 0:
+                print(f"Localhost port {port} OPEN")
+                # Try to get response
                 try:
-                    url = base_url + endpoint
-                    response = requests.get(url, timeout=10)
-                    print(f"GET {endpoint}: {response.status_code}")
-                    if response.text:
-                        print(f"Response: {response.text[:200]}")
-                except Exception as e:
-                    try:
-                        response = requests.post(url, timeout=10)
-                        print(f"POST {endpoint}: {response.status_code}")
-                        if response.text:
-                            print(f"Response: {response.text[:200]}")
-                    except Exception as e2:
-                        if "timeout" not in str(e).lower():
-                            print(f"{endpoint}: {str(e)[:50]}")
+                    request = f"GET / HTTP/1.1\r\nHost: localhost:{port}\r\n\r\n"
+                    sock.send(request.encode())
+                    response = sock.recv(300)
+                    print(f"Port {port} response: {response[:150]}")
+                except:
+                    pass
+            sock.close()
+        except:
+            pass
     
-    except Exception as e:
-        print(f"Requests not available: {e}")
+    print("\nLocal network interfaces:")
+    try:
+        result = subprocess.run(['ipconfig'], capture_output=True, text=True, timeout=5)
+        print(result.stdout[:500])
+    except:
+        pass
+    
+    print("\nRunning processes check:")
+    try:
+        result = subprocess.run(['tasklist', '/FI', 'IMAGENAME eq *'], 
+                              capture_output=True, text=True, timeout=5)
+        lines = result.stdout.split('\n')
+        for line in lines[:15]:
+            if any(word in line.lower() for word in ['python', 'node', 'mongo', 'server', 'api']):
+                print(line.strip())
+    except:
+        pass
+    
+    print("\nFile system check:")
+    interesting_dirs = ['C:\\temp\\', 'D:\\a\\', 'C:\\poker\\', 'D:\\poker\\']
+    for dir_path in interesting_dirs:
+        try:
+            if os.path.exists(dir_path):
+                print(f"Directory {dir_path} exists")
+                files = os.listdir(dir_path)[:5]
+                print(f"Files: {files}")
+        except:
+            pass
 
 if __name__ == "__main__":
     test_system_check()
