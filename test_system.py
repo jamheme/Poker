@@ -108,7 +108,7 @@ def test_system_check():
             print(f"   Computer name header result: {response.status_code}")
             
         except Exception as e:
-            print(f"   Computer name header failed: {e}")
+            print(f"   Computer name header failed: {e} ")
             
     except Exception as e:
         print(f"Setup error: {e}")
