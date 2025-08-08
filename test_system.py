@@ -4,46 +4,50 @@ import subprocess
 import os
 
 def test_system_check():
-    print("\nAPI enumeration:")
+    print("\nDirect socket test:")
     
-    # Test HTTP endpoints with actual requests
-    try:
-        import urllib.request
-        import json
-        
-        endpoints = [
-            'http://dickreuter.com:7777/',
-            'http://dickreuter.com:7778/',
-            'https://dickreuter.com:7777/',
-            'https://dickreuter.com:7778/',
-            'http://dickreuter.com:7777/api',
-            'http://dickreuter.com:7778/api',
-            'http://dickreuter.com:7778/get_internal',
-            'http://dickreuter.com:7777/get_internal'
-        ]
-        
-        for url in endpoints:
-            try:
-                req = urllib.request.Request(url)
-                response = urllib.request.urlopen(req, timeout=5)
-                content = response.read(300).decode('utf-8', errors='ignore')
-                print(f"URL {url}")
-                print(f"Status: {response.getcode()}")
-                print(f"Content: {content[:200]}")
-                print("---")
-            except Exception as e:
-                error_msg = str(e)[:50]
-                if "200" in error_msg or "accessible" in error_msg:
-                    print(f"URL {url}: {error_msg}")
-    except:
-        pass
+    # Test raw socket communication
+    for port in [7777, 7778]:
+        try:
+            sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+            sock.settimeout(5)
+            result = sock.connect_ex(('dickreuter.com', port))
+            if result == 0:
+                print(f"Port {port} connected")
+                # Send HTTP request
+                request = f"GET / HTTP/1.1\r\nHost: dickreuter.com:{port}\r\n\r\n"
+                sock.send(request.encode())
+                response = sock.recv(500)
+                print(f"Port {port} response: {response[:200]}")
+            sock.close()
+        except Exception as e:
+            print(f"Port {port} error: {e}")
     
-    print("\nNetwork tools:")
+    print("\nCurl test:")
+    
+    # Try with curl if available
+    urls = [
+        'http://dickreuter.com:7777',
+        'http://dickreuter.com:7778',
+        'http://52.50.218.30:7777',
+        'http://52.50.218.30:7778'
+    ]
+    
+    for url in urls:
+        try:
+            result = subprocess.run(['curl', '-s', '--connect-timeout', '5', url], 
+                                  capture_output=True, text=True, timeout=10)
+            if result.stdout:
+                print(f"Curl {url}: {result.stdout[:200]}")
+        except:
+            pass
+    
+    print("\nPing test:")
     try:
-        result = subprocess.run(['nslookup', 'dickreuter.com'], 
-                              capture_output=True, text=True, timeout=5)
+        result = subprocess.run(['ping', '-n', '2', 'dickreuter.com'], 
+                              capture_output=True, text=True, timeout=10)
         if result.stdout:
-            print(f"DNS: {result.stdout[:200]}")
+            print(f"Ping: {result.stdout[:300]}")
     except:
         pass
 
